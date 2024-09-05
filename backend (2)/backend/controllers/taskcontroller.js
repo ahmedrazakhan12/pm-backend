@@ -385,14 +385,14 @@ exports.editPriorityInGroup = async (req, res) => {
 const path = require('path');
 const fs = require('fs');
 const { uploadMedia } = require('../includes/uploads3'); // Adjust the path as needed
-
 exports.addMedia = async (req, res) => {
   try {
     const { id } = req.params;
     const { taskId } = req.body;
 
     if (req.files && req.files.length > 0) {
-      console.log("req.files: " , req.files)
+      console.log("req.files: ", req.files);
+
       // Prepare media items for S3 upload
       const mediaItems = req.files.map(file => {
         const filePath = path.join(__dirname, '..', file.path); // Adjust path as needed
@@ -415,9 +415,9 @@ exports.addMedia = async (req, res) => {
       // Check if all uploads were successful
       if (s3Urls && s3Urls.length === mediaItems.length) {
        
-         const mediaFiles = mediaItems.map((item, index) => ({
+        const mediaFiles = mediaItems.map((item, index) => ({
           filename: item.filename,
-          file: s3Urls[0], // Use the S3 URL
+          file: s3Urls[index], // Use the correct S3 URL for each file
           mimetype: item.type,
           projectId: id,
           taskId: taskId
@@ -439,6 +439,60 @@ exports.addMedia = async (req, res) => {
     res.status(500).json({ message: "Internal server error" });
   }
 };
+
+// exports.addMedia = async (req, res) => {
+//   try {
+//     const { id } = req.params;
+//     const { taskId } = req.body;
+
+//     if (req.files && req.files.length > 0) {
+//       console.log("req.files: " , req.files)
+//       // Prepare media items for S3 upload
+//       const mediaItems = req.files.map(file => {
+//         const filePath = path.join(__dirname, '..', file.path); // Adjust path as needed
+//         const fileContent = fs.readFileSync(filePath);
+
+//         return {
+//           filename: file.filename,
+//           data: fileContent, // File content read from disk
+//           type: file.mimetype,
+//           projectId: id,
+//           taskId: taskId
+//         };
+//       });
+
+//       console.log("Files received: ", mediaItems);
+
+//       // Upload files to S3
+//       const s3Urls = await uploadMedia(mediaItems);
+
+//       // Check if all uploads were successful
+//       if (s3Urls && s3Urls.length === mediaItems.length) {
+       
+//          const mediaFiles = mediaItems.map((item, index) => ({
+//           filename: item.filename,
+//           file: s3Urls[0], // Use the S3 URL
+//           mimetype: item.type,
+//           projectId: id,
+//           taskId: taskId
+//         }));
+
+//         // Save file information to the database
+//         await db.taskFilesModel.bulkCreate(mediaFiles);
+//         console.log("Files uploaded and saved successfully");
+
+//         res.status(200).json({ message: "Files uploaded and saved successfully", files: mediaFiles });
+//       } else {
+//         res.status(500).json({ message: "Failed to upload all files to S3" });
+//       }
+//     } else {
+//       res.status(400).json({ message: "No files received" });
+//     }
+//   } catch (error) {
+//     console.error("Error in addMedia: ", error);
+//     res.status(500).json({ message: "Internal server error" });
+//   }
+// };
 
 
 // exports.addMedia = async (req, res) => {
@@ -1030,6 +1084,48 @@ exports.taskStatsofMember = async (req, res) => {
     res.status(500).send("Internal Server Error");
   }
 };
+const dayjs = require('dayjs');
+const relativeTime = require('dayjs/plugin/relativeTime');
+
+// Extend dayjs to use relativeTime
+dayjs.extend(relativeTime);
+exports.getComments = async (req, res) => {
+  try {
+    const { taskId, activeId } = req.query;
+    console.log("taskId, activeId", taskId, activeId);
+    
+    if (!taskId) {
+      return res.status(400).json({ error: 'TaskId is required' });
+    }
+
+    if (!activeId) {
+      return res.status(400).json({ error: 'ActiveId is required' });
+    }
+
+    // Fetch all records that match the taskId and contain activeId in usersIds array
+    const comments = await db.taskCommentsModel.findAll({
+      where: {
+        taskId: taskId,
+        [Sequelize.Op.and]: [
+          Sequelize.literal(`JSON_CONTAINS(usersIds, '[${activeId}]')`)
+        ]
+      },
+    });
+
+    // Optionally format the time (if necessary)
+    const formattedComments = comments.map(comment => ({
+      ...comment.dataValues,
+      timeAgo: dayjs(comment.time).fromNow(),
+    }));
+
+    res.status(200).json(formattedComments);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Server Error' });
+  }
+};
+
+
 
 // exports.getTaskTime = async (req, res) => {
 //   try {

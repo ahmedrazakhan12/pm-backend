@@ -290,6 +290,26 @@ try {
 };
 
 
+const saveTasksCommentsToDatabase = async (cmnt) => {
+    try {
+        console.log("usersIds: " , cmnt.usersIds);
+        
+        const data = await db.taskCommentsModel.create({
+            fromId: cmnt.fromId,
+            taskId: cmnt.toId,
+            text: cmnt.text || null,
+            time: cmnt.time || null,
+            usersIds: cmnt.usersIds ,
+            loggedUser : cmnt.loggedUser, 
+    
+    })
+
+    console.log('Task comments saved to database:', data);
+    }catch (error) {
+    console.error('Error saving task comments to database:', error);
+            
+}}
+
 
 const users = new Map(); // Using a Map to store user data with socket IDs as keys
 // Example function to get socket IDs by user IDs
@@ -472,6 +492,8 @@ io.on('connection', (socket) => {
         socket.broadcast.emit('receiveLeaveChat', data);
     });   
 
+
+ 
   // socket.on('seenMessages', async (data, callback) => {
   //     console.log("Seen messages: ", data);
   //     const sender = users.get(socket.id);
@@ -746,8 +768,58 @@ io.on('connection', (socket) => {
       }
   });
   
-  
-  
+
+ 
+  socket.on('addComments', async (data, callback) => {
+    try {
+        // Extract user IDs and message from data
+        const { usersIds } = data;
+        console.log("usersIds-scoket-comments:", usersIds, data);
+
+        saveTasksCommentsToDatabase(data);
+
+        const sender = users.get(socket.id);
+        if (!sender) {
+            console.log('Sender not found in users map.');
+            if (callback) {
+                return callback({ status: 'error', msg: 'Sender not found' });
+            }
+        }
+
+        // Send the message to the sender
+        if (sender && sender.socketId) {
+            // io.to(sender.socketId).emit('getUserComment', data);
+            console.log('Message sent to sender:', sender.socketId);
+        } else {
+            console.log('Sender has no socketId.');
+        }
+
+        // Loop through each userId and send the message
+        usersIds.forEach(userId => {
+            const recipient = Array.from(users.values()).find(user => user.id == userId);
+            console.log("recipient for userId", userId, ":", recipient);
+
+            if (recipient && recipient.socketId) {
+                io.to(recipient.socketId).emit('getUserComment', data);
+                console.log(`Message sent to user ${recipient.socketId}:`, data);
+            } else {
+                console.log(`Recipient with ID ${userId} not found or has no socketId`);
+            }
+        });
+
+        // Provide callback response
+        if (callback) {
+            callback({ status: 'ok', msg: 'Message sent successfully' });
+        }
+    } catch (error) {
+        console.error(`Error sending message to users ${data.usersIds}:`, error);
+        if (callback) {
+            callback({ status: 'error', msg: 'Message delivery failed' });
+        }
+    }
+});
+
+
   
   // Function to get socket IDs by user IDs
 
@@ -773,7 +845,6 @@ io.on('connection', (socket) => {
       }
   });
 });
-
 
 app.get('/', (req, res) => {
     res.send('Hello Management!');

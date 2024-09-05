@@ -102,6 +102,53 @@ exports.logo = async (req, res) => {
   }
 };
 
+exports.logo = async (req, res) => {
+  try {
+    let logoPath = "https://project-mgt.s3.ap-southeast-2.amazonaws.com/image/1725366291146-1725358152285-1724074854605-ahmed.png";
+
+    if (req.files && req.files.logo && req.files.logo.length > 0) {
+      const file = req.files.logo[0]; // Assuming single file upload
+      const filePath = path.join(__dirname, '..', 'public', 'uploads', 'pfp', file.filename);
+      
+      console.log('File path:', filePath); // Debug log to verify file path
+
+      const fileContent = fs.readFileSync(filePath);
+
+      // Prepare mediaItem for S3 upload
+      const mediaItem = {
+        filename: file.filename,
+        data: fileContent,
+        type: file.mimetype,
+      };
+
+      // Upload the file to S3
+      const s3Urls = await uploadMedia([mediaItem]);
+
+      if (s3Urls && s3Urls.length > 0) {
+        logoPath = s3Urls[0]; // Assuming the first URL is the logo URL
+      } else {
+        return res.status(500).json({ message: "Failed to upload image to S3" });
+      }
+
+    } else {
+      console.log('No logo file found in request');
+      return res.status(400).json({ message: "No logo file uploaded" });
+    }
+
+    // Save paths to database
+    await db.generalModel.update(
+      { logo: logoPath },
+      { where: { id: 1 } }
+    );
+
+    res.status(200).json({ message: "Logo updated successfully" });
+  } catch (err) {
+    console.log('Error updating logo:', err);
+    res.status(400).json({ message: "Error updating logo" });
+  }
+};
+
+
 
 exports.getLogos = async (req, res) => {
   try {

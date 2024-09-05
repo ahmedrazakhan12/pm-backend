@@ -26,6 +26,7 @@ router.get("/getTaskTime/:taskId", taskController.getTaskTime);
 router.delete("/deleteUserTime/:id", taskController.deleteTaskTime);
 router.get("/taskStats/", taskController.taskStats);
 router.get("/taskStatsofMember/:id", taskController.taskStatsofMember);
+router.get("/getComments", taskController.getComments);
 
 
 module.exports = router;
